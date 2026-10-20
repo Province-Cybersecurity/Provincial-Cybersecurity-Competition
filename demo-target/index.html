@@ -1,15 +1,318 @@
 <!doctype html>
 <html lang="zh-CN">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>巡安合成测试站</title>
-<main>
-  <h1>巡安合成测试站</h1>
-  <p>本页只含虚构数据，用于团队自有 GitHub Pages 的授权检查演示。</p>
-  <p>公开测试邮箱：training-contact@example.invalid</p>
-  <p>内部测试标记：DEMO_INTERNAL_ONLY</p>
-  <a href="notice.html">查看合成公告</a>
-  <script src="assets/demo.js"></script>
-</main>
-</html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="巡安是一款面向授权网站的安全风险评估与敏感信息防泄露智能巡检作品。">
+  <meta name="theme-color" content="#07130f">
+  <title>巡安 XUNAN｜网站安全智能巡检</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <div class="scroll-progress" aria-hidden="true"><span></span></div>
+  <div class="pointer-glow" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
 
+  <header class="site-header" id="top">
+    <a class="brand" href="#top" aria-label="巡安首页">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span><strong>巡安</strong><small>XUNAN</small></span>
+    </a>
+    <button class="menu-button" type="button" aria-label="打开导航" aria-expanded="false">
+      <span></span><span></span>
+    </button>
+    <nav class="site-nav" aria-label="主导航">
+      <a href="#workflow">巡检流程</a>
+      <a href="#capabilities">核心能力</a>
+      <a href="#hengnao">恒脑接入</a>
+      <a href="#deploy">部署指南</a>
+      <a href="#lab">授权样例</a>
+    </nav>
+    <a class="header-cta" href="https://github.com/Province-Cybersecurity/Provincial-Cybersecurity-Competition" target="_blank" rel="noreferrer">查看源码 <span>↗</span></a>
+  </header>
+
+  <main id="main-content">
+    <section class="hero section-shell">
+      <div class="hero-copy reveal">
+        <div class="eyebrow"><span class="status-dot"></span> 安恒信息企业命题 · 参赛作品</div>
+        <h1>让网站风险<br><em>有迹可循</em></h1>
+        <p class="hero-lead">巡安是一款面向<strong>已授权网站</strong>的安全巡检智能体。它把页面发现、风险识别、证据脱敏、人工复核和结果报告串成一条清楚、可追溯的工作流。</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#workflow">了解工作流程 <span>↓</span></a>
+          <a class="button ghost" href="#deploy">查看部署方法</a>
+        </div>
+        <div class="trust-row" aria-label="系统特点">
+          <span><b>✓</b> 只读检查</span>
+          <span><b>✓</b> 授权优先</span>
+          <span><b>✓</b> 证据脱敏</span>
+        </div>
+      </div>
+
+      <div class="hero-visual reveal" data-delay="120">
+        <div class="orbit orbit-one"></div>
+        <div class="orbit orbit-two"></div>
+        <div class="scan-card" id="heroScanCard">
+          <div class="scan-card-top">
+            <div class="window-dots"><i></i><i></i><i></i></div>
+            <span>AUTHORIZED SCAN / 01</span>
+            <span class="live-pill">LIVE</span>
+          </div>
+          <div class="target-line">
+            <span class="target-icon">◎</span>
+            <div><small>授权目标</small><strong>demo.example.invalid</strong></div>
+            <span class="lock-icon">⌁</span>
+          </div>
+          <div class="radar" aria-hidden="true">
+            <span class="radar-ring r1"></span><span class="radar-ring r2"></span><span class="radar-ring r3"></span>
+            <span class="radar-sweep"></span><span class="radar-core"></span>
+            <i class="signal s1"></i><i class="signal s2"></i><i class="signal s3"></i>
+          </div>
+          <div class="scan-log" aria-label="演示巡检进度">
+            <div data-hero-step="discover"><span>页面发现</span><b>06</b><i class="done">完成</i></div>
+            <div data-hero-step="rules"><span>规则检测</span><b>08 类</b><i class="running">分析中</i></div>
+            <div data-hero-step="evidence"><span>证据处理</span><b>脱敏</b><i class="queued">排队</i></div>
+          </div>
+          <button class="scan-replay" type="button" aria-label="重新播放巡检过程"><span>↻</span> 重新演示</button>
+          <div class="scan-line" aria-hidden="true"></div>
+        </div>
+        <div class="floating-chip chip-a"><span>!</span> 敏感信息线索</div>
+        <div class="floating-chip chip-b"><span>↗</span> 基线变化 +2</div>
+      </div>
+    </section>
+
+    <section class="metric-strip" aria-label="项目关键数字">
+      <div><strong class="counter" data-count="8">0</strong><span>类风险检查</span></div>
+      <div><strong class="counter" data-count="4">0</strong><span>种报告格式</span></div>
+      <div><strong class="counter" data-count="3">0</strong><span>个智能体工具</span></div>
+      <div><strong>READ<br>ONLY</strong><span>默认只读模式</span></div>
+    </section>
+
+    <section class="intro section-shell" id="overview">
+      <div class="section-kicker reveal"><span>01</span> 为什么做巡安</div>
+      <div class="intro-grid">
+        <div class="section-heading reveal">
+          <h2>安全巡检不该只给出<br><em>一个吓人的结论</em></h2>
+        </div>
+        <div class="intro-copy reveal" data-delay="100">
+          <p>真实的网站安全检查，需要回答四个问题：发现了什么、在哪里发现、为什么值得关注、接下来怎样处理。</p>
+          <p>巡安把每条结果都绑定到来源页面和脱敏证据，并保留规则版本与扫描时间，让队员、老师和评委能够复核过程，而不是只能相信一句“存在风险”。</p>
+          <div class="quote-line"><span></span>先确认授权，再开始巡检；先保留证据，再解释风险。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="workflow section-shell" id="workflow">
+      <div class="section-kicker light reveal"><span>02</span> 从授权到报告</div>
+      <div class="section-heading light reveal">
+        <h2>一次巡检，五步完成</h2>
+        <p>每一步都有明确输入和输出，方便复现，也方便在恒脑智能体中编排。</p>
+      </div>
+      <div class="workflow-grid">
+        <article class="flow-card reveal">
+          <span class="flow-number">01</span><div class="flow-icon">⌁</div>
+          <h3>确认授权</h3><p>限定允许访问的目标、路径与页数，拒绝范围之外的地址。</p>
+          <small>SCOPE FIRST</small>
+        </article>
+        <article class="flow-card reveal" data-delay="70">
+          <span class="flow-number">02</span><div class="flow-icon">⌖</div>
+          <h3>发现页面</h3><p>从入口开始读取站内链接，按边界进行轻量、只读的页面发现。</p>
+          <small>BOUNDED CRAWL</small>
+        </article>
+        <article class="flow-card reveal" data-delay="140">
+          <span class="flow-number">03</span><div class="flow-icon">◫</div>
+          <h3>规则检查</h3><p>使用确定性规则识别敏感信息、明文传输和安全配置线索。</p>
+          <small>RULE ENGINE</small>
+        </article>
+        <article class="flow-card reveal" data-delay="210">
+          <span class="flow-number">04</span><div class="flow-icon">◒</div>
+          <h3>整理证据</h3><p>对证据做脱敏、去重和分级，保留可供人工复核的上下文。</p>
+          <small>EVIDENCE FIRST</small>
+        </article>
+        <article class="flow-card reveal" data-delay="280">
+          <span class="flow-number">05</span><div class="flow-icon">↗</div>
+          <h3>生成报告</h3><p>输出 JSON、HTML、CSV 或 Markdown，并与历史基线比较变化。</p>
+          <small>TRACEABLE REPORT</small>
+        </article>
+      </div>
+    </section>
+
+    <section class="playground section-shell" id="playground">
+      <div class="playground-copy reveal">
+        <div class="section-kicker"><span>LIVE</span> 交互演示</div>
+        <div class="section-heading">
+          <h2>亲手跑一遍<br><em>合成巡检</em></h2>
+          <p>点击开始后，页面会模拟巡安的实际工作顺序。这里不发送任何网络请求，只用于解释流程和答辩演示。</p>
+        </div>
+        <div class="demo-notes">
+          <span><b>01</b>限定目标</span><i></i><span><b>02</b>生成证据</span><i></i><span><b>03</b>整理报告</span>
+        </div>
+      </div>
+      <div class="audit-console reveal" data-delay="120">
+        <div class="console-bar">
+          <div class="window-dots"><i></i><i></i><i></i></div>
+          <span>XUNAN / SAFE DEMO</span>
+          <b data-console-clock>00:00.000</b>
+        </div>
+        <div class="console-target">
+          <span>TARGET</span>
+          <code>province-cybersecurity.github.io/…/notice.html</code>
+          <i>AUTHORIZED</i>
+        </div>
+        <div class="console-progress"><span data-console-progress></span></div>
+        <div class="console-events" aria-live="polite">
+          <div data-demo-event="scope"><i></i><span>验证目标是否命中授权范围</span><b>WAIT</b></div>
+          <div data-demo-event="fetch"><i></i><span>读取公开页面与响应头</span><b>WAIT</b></div>
+          <div data-demo-event="detect"><i></i><span>执行敏感信息与安全配置规则</span><b>WAIT</b></div>
+          <div data-demo-event="mask"><i></i><span>对证据脱敏、去重并分级</span><b>WAIT</b></div>
+          <div data-demo-event="report"><i></i><span>生成可复核的结构化报告</span><b>WAIT</b></div>
+        </div>
+        <div class="console-result" data-console-result hidden>
+          <div><small>页面</small><strong>02</strong></div>
+          <div><small>合成线索</small><strong>03</strong></div>
+          <div><small>越界请求</small><strong>00</strong></div>
+          <span>演示完成 · 可生成报告</span>
+        </div>
+        <button class="run-demo" type="button" data-run-demo><span>▶</span><b>开始模拟巡检</b><small>约 4 秒</small></button>
+      </div>
+    </section>
+
+    <section class="capabilities section-shell" id="capabilities">
+      <div class="section-kicker reveal"><span>03</span> 核心能力</div>
+      <div class="section-heading reveal">
+        <h2>机器负责发现，<br><em>人负责判断</em></h2>
+        <p>巡安优先提供清楚、可核验的信息，不让模型凭空编造扫描结果。</p>
+      </div>
+      <div class="tabs-layout reveal">
+        <div class="tab-list" role="tablist" aria-label="核心能力选项">
+          <button class="tab-button active" role="tab" aria-selected="true" data-tab="evidence"><span>01</span>证据可追溯</button>
+          <button class="tab-button" role="tab" aria-selected="false" data-tab="baseline"><span>02</span>基线看变化</button>
+          <button class="tab-button" role="tab" aria-selected="false" data-tab="boundary"><span>03</span>边界可控制</button>
+          <button class="tab-button" role="tab" aria-selected="false" data-tab="delivery"><span>04</span>结果可交付</button>
+        </div>
+        <div class="tab-panels">
+          <article class="tab-panel active" data-panel="evidence">
+            <div class="panel-copy"><span class="panel-tag">EVIDENCE</span><h3>每条结论，都能找到出处</h3><p>记录规则名称、风险等级、页面地址、脱敏片段和处理建议。相同线索会合并，减少重复告警。</p><ul><li>证据默认脱敏</li><li>来源页面可定位</li><li>支持人工确认状态</li></ul></div>
+            <div class="evidence-card"><div class="evidence-head"><span>RISK / SENSITIVE_DATA</span><b>HIGH</b></div><code>training-***@example.invalid</code><p>发现于 <strong>/notice.html</strong></p><div class="confidence"><span style="--score: 86%"></span></div><small>规则置信提示 86% · 等待人工复核</small></div>
+          </article>
+          <article class="tab-panel" data-panel="baseline">
+            <div class="panel-copy"><span class="panel-tag">BASELINE</span><h3>关注这一次发生了什么变化</h3><p>相同目标可以保存一次结果作为基线。后续巡检会区分新增、持续和已消失线索，帮助团队把注意力放在变化上。</p><ul><li>新增风险优先显示</li><li>历史结果可以回溯</li><li>适合定期巡检演示</li></ul></div>
+            <div class="delta-card"><div><small>较上次巡检</small><strong>+2</strong><span>新增线索</span></div><ul><li><i class="new"></i>1 条敏感信息线索</li><li><i class="new"></i>1 项响应头缺失</li><li><i class="gone"></i>2 条历史线索已消失</li></ul></div>
+          </article>
+          <article class="tab-panel" data-panel="boundary">
+            <div class="panel-copy"><span class="panel-tag">BOUNDARY</span><h3>把“能访问什么”写进系统</h3><p>目标必须命中允许列表。巡检限制页数、深度和超时时间，不执行脚本、不提交表单、不尝试利用漏洞。</p><ul><li>严格目标允许列表</li><li>限制深度和页面数量</li><li>拒绝跨域与参数链接</li></ul></div>
+            <div class="boundary-map"><span class="site-node main-node">授权站点</span><span class="site-node ok-node">/about</span><span class="site-node ok-node two">/notice</span><span class="site-node stop-node">外部域名<br><b>已阻止</b></span><i class="map-line a"></i><i class="map-line b"></i><i class="map-line c"></i></div>
+          </article>
+          <article class="tab-panel" data-panel="delivery">
+            <div class="panel-copy"><span class="panel-tag">DELIVERY</span><h3>同一份结果，适配不同场景</h3><p>结构化格式便于系统接入，可读报告便于展示和归档。报告中同时说明发现项与本次检查的能力边界。</p><ul><li>JSON 用于智能体调用</li><li>HTML 用于现场展示</li><li>CSV / Markdown 用于协作</li></ul></div>
+            <div class="format-stack"><span>JSON<small>结构化接入</small></span><span>HTML<small>可视化报告</small></span><span>CSV<small>表格分析</small></span><span>MD<small>项目归档</small></span></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="hengnao section-shell" id="hengnao">
+      <div class="section-kicker light reveal"><span>04</span> 恒脑智能体接入</div>
+      <div class="hengnao-grid">
+        <div class="section-heading light reveal">
+          <h2>自然语言发起，<br>真实工具执行</h2>
+          <p>智能体负责理解任务和解释结果，巡检服务负责真正访问授权网站。这样可以保证展示出来的数据有真实工具输出作为依据。</p>
+          <div class="integration-state"><span></span><div><small>当前项目状态</small><strong>接口准备就绪 · 等待平台联调</strong></div></div>
+        </div>
+        <div class="pipeline reveal" data-delay="120">
+          <div class="pipe-node"><span>01</span><div><small>参赛者</small><strong>输入巡检目标与范围</strong></div></div>
+          <i class="pipe-arrow">↓</i>
+          <div class="pipe-node accent"><span>02</span><div><small>恒脑智能体</small><strong>判断意图并调用工具</strong></div></div>
+          <i class="pipe-arrow">↓</i>
+          <div class="pipe-node"><span>03</span><div><small>巡安 API</small><strong>执行只读检查并保存结果</strong></div></div>
+          <i class="pipe-arrow">↓</i>
+          <div class="pipe-node"><span>04</span><div><small>最终交付</small><strong>解释风险、证据与处理建议</strong></div></div>
+        </div>
+      </div>
+      <div class="tool-row reveal">
+        <article><span>POST</span><code>/api/runs</code><p>创建一次授权巡检任务</p></article>
+        <article><span>GET</span><code>/api/runs/{id}</code><p>查询任务状态和摘要</p></article>
+        <article><span>GET</span><code>/api/reports/{id}</code><p>获取指定格式的报告</p></article>
+      </div>
+    </section>
+
+    <section class="deploy section-shell" id="deploy">
+      <div class="section-kicker reveal"><span>05</span> 部署与接入</div>
+      <div class="section-heading reveal">
+        <h2>从本地运行，到比赛展示</h2>
+        <p>下面的四个步骤分别解决后端运行、外网访问、恒脑配置和静态展示。复制命令即可按顺序完成。</p>
+      </div>
+      <div class="deploy-layout reveal">
+        <div class="deploy-tabs" role="tablist" aria-label="部署步骤">
+          <button class="deploy-tab active" data-deploy="local"><span>01</span><div><strong>本地启动</strong><small>先验证服务可运行</small></div></button>
+          <button class="deploy-tab" data-deploy="server"><span>02</span><div><strong>部署后端</strong><small>提供 HTTPS 公网地址</small></div></button>
+          <button class="deploy-tab" data-deploy="agent"><span>03</span><div><strong>接入恒脑</strong><small>配置三个 API 工具</small></div></button>
+          <button class="deploy-tab" data-deploy="pages"><span>04</span><div><strong>GitHub Pages</strong><small>发布介绍与测试站</small></div></button>
+        </div>
+        <div class="deploy-panels">
+          <article class="deploy-panel active" data-deploy-panel="local">
+            <span class="step-label">STEP 01 · LOCAL</span><h3>在电脑上启动巡安服务</h3><p>下载代码后进入仓库目录，使用 Python 启动服务。浏览器访问本地地址，先完成一次合成目标巡检。</p>
+            <div class="code-block"><div><i></i><i></i><i></i><span>Terminal</span><button class="copy-button" data-copy="python3 -m xunan">复制</button></div><pre><code>python3 -m xunan</code></pre></div>
+            <p class="step-note"><b>检查点</b> 访问 <code>http://127.0.0.1:8765</code>，确认首页和健康检查可以打开。</p>
+          </article>
+          <article class="deploy-panel" data-deploy-panel="server">
+            <span class="step-label">STEP 02 · SERVER</span><h3>把巡检后端放到可访问的服务器</h3><p>恒脑需要通过 HTTPS 访问巡安 API。请在服务器设置访问密钥、公开地址和授权目标，再启动服务。</p>
+            <div class="code-block"><div><i></i><i></i><i></i><span>Environment</span><button class="copy-button" data-copy="export XUNAN_API_KEY='请替换为至少24位随机密钥'\nexport XUNAN_PUBLIC_ORIGIN='https://scanner.example'\nexport XUNAN_ALLOWED_TARGETS='https://authorized-demo.example/'\npython3 -m xunan --host 0.0.0.0 --port 8765">复制</button></div><pre><code>export XUNAN_API_KEY='至少24位随机密钥'
+export XUNAN_PUBLIC_ORIGIN='https://scanner.example'
+export XUNAN_ALLOWED_TARGETS='https://authorized-demo.example/'
+python3 -m xunan --host 0.0.0.0 --port 8765</code></pre></div>
+            <p class="step-note"><b>检查点</b> 只把经过授权的演示站点加入允许列表，密钥不要写入公开仓库。</p>
+          </article>
+          <article class="deploy-panel" data-deploy-panel="agent">
+            <span class="step-label">STEP 03 · HENGNAO</span><h3>让恒脑智能体调用真实工具</h3><p>在恒脑创建智能体，导入项目提供的 OpenAPI 契约，配置服务地址和 <code>X-API-Key</code>，再添加系统提示词。</p>
+            <ol class="check-list"><li><span>1</span>导入 <code>docs/hengnao-openapi.yaml</code></li><li><span>2</span>配置公网 HTTPS 服务地址</li><li><span>3</span>为请求头设置 <code>X-API-Key</code></li><li><span>4</span>分别试运行创建、查询、报告工具</li><li><span>5</span>保存成功调用截图作为联调证据</li></ol>
+            <p class="step-note"><b>检查点</b> 智能体回答中的编号、风险数量和证据应与 API 返回一致。</p>
+          </article>
+          <article class="deploy-panel" data-deploy-panel="pages">
+            <span class="step-label">STEP 04 · PAGES</span><h3>用 GitHub Pages 发布项目展示页</h3><p>本页面由仓库中的工作流自动部署。推送 <code>demo-target/</code> 目录后，GitHub 会重新构建并发布静态站点。</p>
+            <ol class="check-list"><li><span>1</span>进入仓库 Settings → Pages</li><li><span>2</span>将 Source 设为 GitHub Actions</li><li><span>3</span>推送页面代码到 <code>main</code> 分支</li><li><span>4</span>在 Actions 中等待绿色完成标记</li><li><span>5</span>打开 Pages 地址检查电脑和手机显示</li></ol>
+            <p class="step-note"><b>说明</b> GitHub Pages 只托管介绍页和合成测试素材；Python 巡检后端仍需单独部署。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="lab section-shell" id="lab">
+      <div class="lab-heading reveal">
+        <div><div class="section-kicker"><span>06</span> 授权测试样例</div><h2>一个可公开巡检的<br><em>合成目标</em></h2></div>
+        <p>为了展示敏感信息识别能力，本页面特意放置了完全虚构的测试线索。它们不对应真实人员、账号或系统，仅用于本队自有环境中的只读演示。</p>
+      </div>
+      <div class="lab-grid">
+        <article class="fixture-card reveal"><span class="fixture-label">SYNTHETIC EMAIL</span><small>公开测试邮箱</small><strong>training-contact@example.invalid</strong><button class="copy-button mini" data-copy="training-contact@example.invalid">复制样例</button></article>
+        <article class="fixture-card reveal" data-delay="80"><span class="fixture-label">TEST MARKER</span><small>内部测试标记</small><strong>DEMO_INTERNAL_ONLY</strong><button class="copy-button mini" data-copy="DEMO_INTERNAL_ONLY">复制样例</button></article>
+        <article class="fixture-card reveal" data-delay="160"><span class="fixture-label">FAKE TOKEN</span><small>脚本中的虚构令牌</small><strong>DEMO_ONLY_••••_123456</strong><button class="copy-button mini" data-copy="DEMO_ONLY_NOT_A_REAL_TOKEN_123456">复制样例</button></article>
+      </div>
+      <a class="notice-link reveal" href="notice.html"><span>打开合成测试公告</span><small>查看样例的用途、范围和注意事项</small><b>↗</b></a>
+    </section>
+
+    <section class="boundary section-shell" id="boundary">
+      <div class="section-kicker light reveal"><span>07</span> 能力与安全边界</div>
+      <div class="boundary-grid">
+        <div class="section-heading light reveal"><h2>知道系统会做什么，<br>也知道它<em>不会做什么</em></h2></div>
+        <div class="boundary-lists reveal" data-delay="100">
+          <div><h3><span>✓</span>当前支持</h3><ul><li>读取公开 HTML 页面与响应头</li><li>检查 8 类常见风险线索</li><li>证据脱敏、去重与人工复核</li><li>基线对比和多格式报告</li></ul></div>
+          <div><h3><span>×</span>当前不执行</h3><ul><li>不登录网站，不携带用户 Cookie</li><li>不执行 JavaScript，不提交表单</li><li>不尝试攻击、利用或绕过认证</li><li>不把结果等同于完整渗透测试</li></ul></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing section-shell reveal">
+      <div><span class="eyebrow"><span class="status-dot"></span> XUNAN / COMPETITION EDITION</span><h2>让每一次巡检，<br>都能说明白。</h2></div>
+      <div><p>查看完整代码、接口契约、恒脑配置说明和比赛演示脚本。</p><a class="button primary" href="https://github.com/Province-Cybersecurity/Provincial-Cybersecurity-Competition" target="_blank" rel="noreferrer">进入 GitHub 仓库 <span>↗</span></a></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand" href="#top"><span class="brand-mark"><i></i><i></i><i></i></span><span><strong>巡安</strong><small>XUNAN</small></span></a>
+    <p>第九届浙江省大学生网络与信息安全竞赛 · 安恒信息企业命题</p>
+    <p>本页面中的巡检数据均为合成演示内容。</p>
+  </footer>
+  <div class="toast" role="status" aria-live="polite">已复制到剪贴板</div>
+  <script src="assets/demo.js"></script>
+</body>
+</html>
