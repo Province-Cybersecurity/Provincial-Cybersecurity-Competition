@@ -19,6 +19,39 @@ from .storage import Store
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def compact_run(run):
+    """Return a bounded JSON result suitable for synchronous agent tools."""
+    findings = []
+    for item in run.get("findings", [])[:6]:
+        findings.append({key: item.get(key) for key in (
+            "id", "title", "category", "severity", "confidence", "url",
+            "evidence", "impact", "remediation", "review_status",
+        )})
+    comparison = run.get("comparison", {})
+    return {
+        "id": run["id"],
+        "created_at": run["created_at"],
+        "target": run["target"],
+        "mode": run["mode"],
+        "variant": run.get("variant"),
+        "status": run["status"],
+        "baseline_id": run.get("baseline_id"),
+        "summary": run["summary"],
+        "coverage": run["coverage"],
+        "comparison": {
+            "counts": comparison.get("counts", {}),
+            "complete": comparison.get("complete", False),
+            "baseline_note": comparison.get("baseline_note", ""),
+        },
+        "findings": findings,
+        "findings_returned": len(findings),
+        "findings_total": len(run.get("findings", [])),
+        "findings_truncated": len(run.get("findings", [])) > len(findings),
+        "limitations": run.get("limitations", []),
+        "authorization": run.get("authorization", {}),
+    }
+
+
 class Application:
     def __init__(self, data_dir, targets=(), allow_private=False, token=None, public_origin=None):
         self.store = Store(Path(data_dir) / "xunan.sqlite3")
@@ -105,6 +138,18 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/api/state":
                 return self.send_json(200, self.app.state())
+            platform_match = re.fullmatch(r"/api/hengnao/(runs|reports)/([a-f0-9]{32})", path)
+            if platform_match:
+                run = self.app.store.get_run(platform_match.group(2))
+                if not run:
+                    return self.send_json(404, {"error": "任务不存在"})
+                result = compact_run(run)
+                if platform_match.group(1) == "reports":
+                    report, _, _ = render(run, "markdown")
+                    text = report.decode("utf-8")
+                    result["report_markdown"] = text[:12000]
+                    result["report_truncated"] = len(text) > 12000
+                return self.send_json(200, result)
             match = re.fullmatch(r"/api/(runs|reports)/([a-f0-9]{32})", path)
             if match:
                 run = self.app.store.get_run(match.group(2))
@@ -141,6 +186,8 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(data, dict):
                 raise ValueError("请求内容必须是 JSON 对象")
             path = urlsplit(self.path).path
+            if path == "/api/hengnao/runs":
+                return self.send_json(200, compact_run(self.app.service.inspect(data)))
             if path == "/api/runs":
                 return self.send_json(201, self.app.service.inspect(data))
             if path == "/api/reviews":
