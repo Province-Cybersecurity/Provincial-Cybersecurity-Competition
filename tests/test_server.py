@@ -123,6 +123,37 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
         self.assertEqual(json.loads(body)["id"], run["id"])
 
+    def test_hengnao_compatibility_endpoints_return_bounded_json(self):
+        status, headers, body = self.json_request("POST", "/api/hengnao/runs", {
+            "mode": "demo",
+            "variant": "before",
+            "authorized": True,
+            "custom_keywords": ["内部资料"],
+            "max_pages": 3,
+        })
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json; charset=utf-8")
+        run = json.loads(body)
+        self.assertEqual(run["status"], "completed")
+        self.assertLessEqual(run["findings_returned"], 6)
+        self.assertEqual(run["findings_total"], run["summary"]["total"])
+        self.assertNotIn("documents", run)
+        self.assertNotIn("timeline", run)
+
+        for endpoint in ("runs", "reports"):
+            status, _headers, body = self.request(
+                "GET",
+                "/api/hengnao/" + endpoint + "/" + run["id"],
+                headers={"X-API-Key": self.token},
+            )
+            self.assertEqual(status, 200)
+            result = json.loads(body)
+            self.assertEqual(result["id"], run["id"])
+            self.assertLessEqual(len(result["findings"]), 6)
+            if endpoint == "reports":
+                self.assertIn("# 巡安授权网站巡检报告", result["report_markdown"])
+                self.assertLessEqual(len(result["report_markdown"]), 12000)
+
     def test_post_content_type_and_size_limits(self):
         valid = b'{"mode":"demo","variant":"after","authorized":true}'
         status, _headers, _body = self.request(
