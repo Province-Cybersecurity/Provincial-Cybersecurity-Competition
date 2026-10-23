@@ -5,6 +5,10 @@ import io
 import json
 
 
+REVIEW = {"pending": "待确认", "confirmed": "已确认", "false_positive": "误报"}
+COMPARISON = {"new": "新发现", "persistent": "持续存在", "not_observed": "本次未再发现（待确认）", "uncertain": "覆盖不足，待复查"}
+
+
 SEVERITY = {"high": "高", "medium": "中", "low": "低", "info": "提示"}
 
 
@@ -20,29 +24,41 @@ def render(run, format_name):
     if format_name == "csv":
         output = io.StringIO(newline="")
         writer = csv.writer(output)
-        writer.writerow(["发现编号", "规则", "等级", "标题", "页面", "行", "脱敏证据", "复核状态", "修复建议"])
+        writer.writerow(["发现编号", "规则", "等级", "标题", "页面", "行", "脱敏证据", "复核状态", "复核备注", "修复建议"])
         for finding in run["findings"]:
-            writer.writerow([csv_cell(finding.get(k)) for k in ("id", "rule_id", "severity", "title", "url", "line", "evidence", "review_status", "remediation")])
+            writer.writerow([csv_cell(finding.get(k)) for k in ("id", "rule_id", "severity", "title", "url", "line", "evidence", "review_status", "review_note", "remediation")])
         return ("\ufeff" + output.getvalue()).encode(), "text/csv; charset=utf-8", "csv"
     if format_name not in ("html", "markdown"):
         raise ValueError("报告格式支持 json、html、csv、markdown")
     e = lambda value: html.escape(str(value), quote=True)
     rows = []
     for index, finding in enumerate(run["findings"], 1):
-        rows.append("<section><h2>" + str(index) + ". " + e(finding["title"]) + "</h2><p>等级：" + e(SEVERITY.get(finding["severity"], finding["severity"])) + " · 规则：" + e(finding["rule_id"]) + " · 复核：" + e(finding.get("review_status", "pending")) + "</p><p>位置：" + e(finding["url"]) + "，第 " + e(finding.get("line", 0)) + " 行</p><pre>" + e(finding["evidence"]) + "</pre><p>可能影响：" + e(finding["impact"]) + "</p><p>处理建议：" + e(finding["remediation"]) + "</p></section>")
+        rows.append("<section><h2>" + str(index) + ". " + e(finding["title"]) + "</h2><p>等级：" + e(SEVERITY.get(finding["severity"], finding["severity"])) + " · 规则：" + e(finding["rule_id"]) + " · 复核：" + e(REVIEW.get(finding.get("review_status"), "待确认")) + "</p><p>位置：" + e(finding["url"]) + "，第 " + e(finding.get("line", 0)) + " 行</p><pre>" + e(finding["evidence"]) + "</pre><p>可能影响：" + e(finding["impact"]) + "</p><p>处理建议：" + e(finding["remediation"]) + "</p><p>复核备注：" + e(finding.get("review_note") or "暂无备注") + "</p></section>")
     summary = run["summary"]
     coverage = run["coverage"]
     heading = "巡安授权网站巡检报告"
     metadata = "任务 " + run["id"] + " · " + run["created_at"]
     brief = "共 " + str(summary["total"]) + " 条待复核发现；检查 " + str(coverage["visited"]) + " 个资源。任务状态：" + run["status"] + "。"
     caveats = "；".join(run["limitations"])
+    counts = run.get("comparison", {}).get("counts", {})
+    comparison_summary = "；".join(label + " " + str(counts.get(key, 0)) + " 条" for key, label in COMPARISON.items())
+    baseline_note = "未再发现不等于已修复；覆盖不足时保留待复查。" if run.get("baseline_id") else "首轮检查，全部记录为新增，尚无复测结论。"
+    comparison_rows = []
+    for key, label in COMPARISON.items():
+        entries = [entry for entry in run.get("comparison", {}).get("entries", []) if entry.get("status") == key]
+        comparison_rows.append("<section><h3>" + e(label) + "</h3>" + ("".join("<p>" + e(entry.get("title", "")) + " · " + e(entry.get("url", "")) + "</p>" for entry in entries) or "<p>无此类记录</p>") + "</section>")
     if format_name == "markdown":
         # Escape HTML and markdown syntax in all user-controlled prose.
         def md(value):
             return html.escape(str(value)).replace("\\", "\\\\").replace("`", "\\`").replace("[", "\\[").replace("]", "\\]").replace("*", "\\*").replace("#", "\\#").replace("_", "\\_").replace("\n", " ")
-        lines = ["# " + heading, "", md(metadata), "", "目标：" + md(run["target"]), "", brief, "", "## 范围与限制", "", md(caveats), "", "## 基线对比", "", md(json.dumps(run["comparison"]["counts"], ensure_ascii=False)), "", "未再发现并不代表已修复；需要结合覆盖情况与人工复核。", ""]
+        lines = ["# " + heading, "", md(metadata), "", "目标：" + md(run["target"]), "", md(brief), "", "## 范围与限制", "", md(caveats), "", "## 基线对比", "", md(comparison_summary), "", md(baseline_note), ""]
+        for key, label in COMPARISON.items():
+            lines += ["### " + label, ""]
+            entries = [entry for entry in run.get("comparison", {}).get("entries", []) if entry.get("status") == key]
+            lines += [md(entry.get("title", "")) + " · " + md(entry.get("url", "")) for entry in entries] or ["无此类记录"]
+            lines.append("")
         for i, f in enumerate(run["findings"], 1):
-            lines += ["## " + str(i) + ". " + md(f["title"]), "", "等级：" + md(f["severity"]) + "；规则：" + md(f["rule_id"]), "", "位置：" + md(f["url"]) + "；行：" + str(f.get("line", 0)), "", "证据：" + md(f["evidence"]), "", "建议：" + md(f["remediation"]), ""]
+            lines += ["## " + str(i) + ". " + md(f["title"]), "", "等级：" + md(f["severity"]) + "；规则：" + md(f["rule_id"]), "", "位置：" + md(f["url"]) + "；行：" + md(f.get("line", 0)), "", "证据：" + md(f["evidence"]), "", "建议：" + md(f["remediation"]), "", "复核：" + md(REVIEW.get(f.get("review_status"), "待确认")), "", "复核备注：" + md(f.get("review_note") or "暂无备注"), ""]
         return "\n".join(lines).encode(), "text/markdown; charset=utf-8", "md"
-    content = """<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>巡安巡检报告</title><style>body{font:16px/1.7 system-ui,sans-serif;color:#172b3a;max-width:960px;margin:40px auto;padding:0 24px}header{border-bottom:3px solid #167b79;padding-bottom:18px}section{border-bottom:1px solid #ddd;padding:16px 0;break-inside:avoid}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f5f5;padding:16px}p{overflow-wrap:anywhere}aside{background:#fff7e4;padding:18px}@media print{body{margin:0;max-width:none}h1{font-size:24px}}</style><header><h1>""" + heading + "</h1><p>" + e(metadata) + "</p><p>目标：" + e(run["target"]) + "</p><p>" + e(brief) + "</p></header><aside>" + e(caveats) + "</aside><h2>基线对比</h2><p>" + e(json.dumps(run["comparison"]["counts"], ensure_ascii=False)) + "</p><p>未再发现不等于已修复；覆盖不足时保留待复查。</p><h2>覆盖情况</h2><p>" + e(coverage.get("scope_note", "")) + "</p><pre>" + e(json.dumps(coverage["errors"], ensure_ascii=False, indent=2)) + "</pre>" + "".join(rows) + "</html>"
+    content = """<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>巡安巡检报告</title><style>body{font:16px/1.7 system-ui,sans-serif;color:#172b3a;max-width:960px;margin:40px auto;padding:0 24px}header{border-bottom:3px solid #167b79;padding-bottom:18px}section{border-bottom:1px solid #ddd;padding:16px 0;break-inside:avoid}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f5f5;padding:16px}p{overflow-wrap:anywhere}aside{background:#fff7e4;padding:18px}@media print{body{margin:0;max-width:none}h1{font-size:24px}}</style><header><h1>""" + heading + "</h1><p>" + e(metadata) + "</p><p>目标：" + e(run["target"]) + "</p><p>" + e(brief) + "</p></header><aside>" + e(caveats) + "</aside><h2>基线对比</h2><p>" + e(comparison_summary) + "</p><p>" + e(baseline_note) + "</p>" + "".join(comparison_rows) + "<h2>覆盖情况</h2><p>" + e(coverage.get("scope_note", "")) + "</p><pre>" + e(json.dumps(coverage["errors"], ensure_ascii=False, indent=2)) + "</pre>" + "".join(rows) + "</html>"
     return content.encode(), "text/html; charset=utf-8", "html"
