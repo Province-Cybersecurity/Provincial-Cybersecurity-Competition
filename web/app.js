@@ -16,6 +16,14 @@
   let toastTimer;
   let connected = false;
   let cache = new Map();
+  let historyPage = 1;
+  let refreshing = false;
+  let refreshTask = null;
+  let lastRefresh = null;
+  let previewSequence = 0;
+  let demoKeywords = null;
+  const categoryNames = { sensitive: "敏感信息", transport: "传输安全", review: "页面行为", hardening: "配置加固", custom: "自定义关键词" };
+  const filterIds = ["severity-filter", "review-filter", "rule-filter", "category-filter", "url-filter", "finding-search"];
 
   function node(tag, className, content) {
     const result = document.createElement(tag);
@@ -57,7 +65,7 @@
   function date(value) {
     if (!value) return "时间未记录";
     const parsed = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value);
-    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
   }
 
   function targetLabel(run) {
@@ -65,7 +73,7 @@
     return string(run.target, "未记录目标");
   }
 
-  function runLabel(run) { return `${date(run.created_at)} · ${targetLabel(run)} · ${String(run.id).slice(0, 8)}`; }
+  function runLabel(run) { return `${date(run.created_at)} · ${targetLabel(run)} · ${number(run.summary?.total)} 条发现 · ${run.baseline_id ? "有基线" : "无基线"} · ${String(run.id).slice(0, 8)}`; }
 
   function targets() {
     return (state.targets || []).map(value => typeof value === "string" ? value : value.origin || value.url || value.target || "").filter(Boolean);
@@ -132,7 +140,7 @@
     return response.json();
   }
 
-  function go(page, updateHash = true) {
+  function go(page, updateHash = true, autoLoad = true) {
     if (!Object.hasOwn(pageNames, page)) page = "overview";
     $$(".page").forEach(section => {
       const active = section.id === `page-${page}`;
@@ -146,26 +154,65 @@
       else button.removeAttribute("aria-current");
     });
     $("#breadcrumb-current").textContent = pageNames[page];
+    $("#main").focus({ preventScroll: true });
     if (updateHash) history.replaceState(null, "", `#${page}`);
-    if (page === "findings" && !selectedRun && state.runs.length) loadRun(state.runs[0].id).catch(error => notify(error.message, true));
+    if (autoLoad && page === "findings" && !selectedRun && state.runs.length) loadRun(state.runs[0].id).catch(error => notify(error.message, true));
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
-  function updateRunOptions() {
+  function normalizedTarget(value) {
+    try {
+      const url = new URL(value.trim());
+      if (!/^https?:$/.test(url.protocol) || url.username || url.password) return "";
+      url.search = ""; url.hash = "";
+      url.hostname = url.hostname.replace(/\.$/, "");
+      return url.href;
+    } catch (_) { return ""; }
+  }
+
+  function updateBaselineOptions() {
     const baseline = $("#baseline-select");
-    const currentBaseline = baseline.value;
-    baseline.replaceChildren(new Option("首次检查，暂不对比", ""));
-    const runSelector = $("#finding-run");
-    const currentRunId = selectedRun?.id || runSelector.value;
-    runSelector.replaceChildren();
-    for (const run of state.runs) {
-      baseline.add(new Option(runLabel(run), run.id));
-      runSelector.add(new Option(runLabel(run), run.id));
+    const previous = baseline.value;
+    const mode = $("input[name=mode]:checked").value;
+    const target = normalizedTarget($("#target-input").value);
+    const matches = state.runs.filter(run => run.mode === mode &&
+      (mode === "demo" || (target && normalizedTarget(run.target) === target)));
+    baseline.replaceChildren(new Option(matches.length ? "首次检查，暂不对比" : "当前目标暂无可用基线", ""));
+    for (const run of matches) baseline.add(new Option(runLabel(run), run.id));
+    if (matches.some(run => run.id === previous)) baseline.value = previous;
+    baseline.disabled = !matches.length;
+  }
+
+  function updateRunOptions() {
+    updateBaselineOptions();
+    const selector = $("#finding-run");
+    const current = selectedRun?.id || selector.value;
+    selector.replaceChildren(...state.runs.map(run => new Option(runLabel(run), run.id)));
+    if (state.runs.some(run => run.id === current)) selector.value = current;
+    if (!state.runs.length) selector.add(new Option("暂无巡检记录", ""));
+    selector.disabled = !state.runs.length;
+  }
+
+  function skeleton() {
+    const box = node("div", "skeleton", "");
+    box.setAttribute("role", "status"); box.setAttribute("aria-label", "正在载入巡检证据");
+    for (let i = 0; i < 4; i++) box.append(node("div", "skeleton-line"));
+    return box;
+  }
+
+  function clearFilters() {
+    for (const id of filterIds) $("#" + id).value = id.endsWith("filter") && !["url-filter"].includes(id) ? "all" : "";
+    $("#finding-sort").value = "severity";
+    renderSelectedRun();
+  }
+
+  function updateFindingFilters(run) {
+    for (const [id, key, label] of [["rule-filter", "rule_id", "全部规则"], ["category-filter", "category", "全部分类"]]) {
+      const control = $("#" + id), previous = control.value;
+      const values = [...new Set((run.findings || []).map(f => f[key]).filter(Boolean))].sort();
+      control.replaceChildren(new Option(label, "all"), ...values.map(value => new Option(key === "category" ? categoryNames[value] || value : value, value)));
+      if (values.includes(previous)) control.value = previous;
     }
-    if (state.runs.some(run => run.id === currentBaseline)) baseline.value = currentBaseline;
-    if (state.runs.some(run => run.id === currentRunId)) runSelector.value = currentRunId;
-    if (!state.runs.length) runSelector.add(new Option("暂无巡检记录", ""));
-    runSelector.disabled = !state.runs.length;
   }
 
   function renderMetrics() {
@@ -214,7 +261,7 @@
   function findingsTable(findings, runId, compact = false) {
     if (!findings.length) return empty("当前没有匹配的发现", "这表示本轮规则没有命中；请结合检查范围和抓取情况评估结果。");
     const wrap = node("div", "table-wrap");
-    const table = node("table");
+    const table = node("table", "findings-grid");
     const head = node("thead");
     const headRow = node("tr");
     ["风险级别", "发现与来源", "检测规则", "确认状态", ""].forEach(label => headRow.append(node("th", "", label)));
@@ -227,12 +274,13 @@
       const title = node("td");
       title.append(action(string(finding.title, "未命名发现"), () => showFinding(runId, finding.id), "finding-title"), node("span", "cell-subline", string(finding.url)));
       const rule = node("td");
-      rule.append(node("span", "", string(finding.rule_id)), node("span", "cell-subline", string(finding.category, "内容与配置检查")));
+      rule.append(node("span", "", string(finding.rule_id)), node("span", "cell-subline", categoryNames[finding.category] || string(finding.category, "内容与配置检查")));
       const review = node("td");
       review.append(reviewBadge(finding.review_status));
       const link = node("td");
       link.append(action("查看证据 ↗", () => showFinding(runId, finding.id), "table-action"));
       row.append(severity, title, rule, review, link);
+      [...row.children].forEach((cell, i) => { cell.dataset.label = ["风险级别", "发现与来源", "检测规则", "确认状态", ""][i]; });
       body.append(row);
     }
     table.append(head, body);
@@ -242,23 +290,34 @@
   }
 
   function renderHistory() {
-    $("#history-count").textContent = `${state.runs.length} 条记录`;
+    const query = $("#history-search").value.trim().toLowerCase();
+    const mode = $("#history-mode").value;
+    const filtered = state.runs.filter(run => (mode === "all" || run.mode === mode) &&
+      `${targetLabel(run)} ${date(run.created_at)} ${run.created_at} ${run.id}`.toLowerCase().includes(query));
+    $("#history-count").textContent = `${filtered.length} / ${state.runs.length} 条记录`;
+    const pages = Math.max(1, Math.ceil(filtered.length / 10));
+    historyPage = Math.min(historyPage, pages);
+    const previous = action("← 上一页", () => { historyPage--; renderHistory(); }); previous.disabled = historyPage === 1;
+    const next = action("下一页 →", () => { historyPage++; renderHistory(); }); next.disabled = historyPage === pages;
+    replace("#history-pagination", filtered.length > 10 ? [previous, node("span", "", `第 ${historyPage} / ${pages} 页 · 每页 10 条`), next] : []);
+    if (state.runs.length && !filtered.length) return replace("#history-list", empty("没有找到匹配记录", "试试目标的一部分、日期或任务编号。搜索范围为最近 100 条记录。", "清除搜索", () => { $("#history-search").value = ""; $("#history-mode").value = "all"; renderHistory(); }));
     if (!state.runs.length) return replace("#history-list", empty("暂时没有检查记录", "完成第一次巡检后，可以在这里回看结果。", "发起巡检", () => go("new-run")));
     const wrap = node("div", "table-wrap");
-    const table = node("table");
+    const table = node("table", "history-grid");
     table.setAttribute("aria-label", "巡检历史记录");
     const head = node("thead");
     const headRow = node("tr");
     ["巡检目标", "开始时间", "执行状态", "发现数量", "对比基线", ""].forEach(text => headRow.append(node("th", "", text)));
     head.append(headRow);
     const body = node("tbody");
-    for (const run of state.runs) {
+    for (const run of filtered.slice((historyPage - 1) * 10, historyPage * 10)) {
       const row = node("tr");
       const target = node("td");
       target.append(action(targetLabel(run), () => openRun(run.id), "finding-title"), node("small", "cell-subline", run.id));
       const status = node("td"); status.append(statusBadge(run.status));
       const detail = node("td"); detail.append(action("查看结果 →", () => openRun(run.id), "table-action"));
       row.append(target, node("td", "", date(run.created_at)), status, node("td", "", `${number(run.summary?.total)} 条 · 高风险 ${number(run.summary?.high)}`), node("td", "", run.baseline_id ? "已选择" : "首次 / 未选择"), detail);
+      [...row.children].forEach((cell, i) => { cell.dataset.label = ["巡检目标", "开始时间", "执行状态", "发现数量", "对比基线", ""][i]; });
       body.append(row);
     }
     table.append(head, body); wrap.append(table); replace("#history-list", wrap);
@@ -355,12 +414,35 @@
     const label = node("div");
     label.append(node("h3", "", targetLabel(run)), node("p", "", `${date(run.created_at)} · ${run.mode === "demo" ? "内置合成样例" : "已授权网站"} · ${run.id}`));
     meta.append(label, statusBadge(run.status));
+    if (run.mode === "demo" && run.variant === "before") {
+      meta.append(action("下一步：检查修复版 →", () => {
+        $("input[name=mode][value=demo]").checked = true;
+        $("#demo-variant").value = "after"; updateMode();
+        $("#baseline-select").value = run.id;
+        $("#authorized").checked = false;
+        if (demoKeywords?.id === run.id) $("#custom-keywords").value = demoKeywords.values.join("\n");
+        go("new-run");
+        notify("已选择修复版和本次基线。请保持关键词一致，确认后开始复查。");
+      }));
+    }
     replace("#finding-run-meta", meta);
+    updateFindingFilters(run);
     const severity = $("#severity-filter").value;
     const review = $("#review-filter").value;
-    const findings = (run.findings || []).filter(item => (severity === "all" || item.severity === severity) && (review === "all" || (item.review_status || "pending") === review)).sort((a, b) => (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4));
+    const rule = $("#rule-filter").value, category = $("#category-filter").value;
+    const urlQuery = $("#url-filter").value.trim().toLowerCase(), query = $("#finding-search").value.trim().toLowerCase();
+    const sort = $("#finding-sort").value;
+    const findings = (run.findings || []).filter(item =>
+      (severity === "all" || item.severity === severity) &&
+      (review === "all" || (item.review_status || "pending") === review) &&
+      (rule === "all" || item.rule_id === rule) && (category === "all" || item.category === category) &&
+      String(item.url || "").toLowerCase().includes(urlQuery) &&
+      `${item.title || ""} ${item.evidence || ""}`.toLowerCase().includes(query)
+    ).sort((a, b) => sort === "severity" ? (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4) :
+      ((Date.parse(a.observed_at) || 0) - (Date.parse(b.observed_at) || 0)) * (sort === "newest" ? -1 : 1));
     $("#findings-count").textContent = `${findings.length} / ${(run.findings || []).length} 条发现`;
-    replace("#findings-table", findingsTable(findings, run.id));
+    $("#filter-status").textContent = `显示 ${findings.length} 条，共 ${(run.findings || []).length} 条`;
+    replace("#findings-table", !findings.length && run.findings?.length ? empty("没有符合筛选条件的发现", "试着减少筛选条件；已有巡检记录不会被删除。", "清除全部筛选", clearFilters) : findingsTable(findings, run.id));
     renderComparison(run); renderCoverage(run);
   }
 
@@ -370,18 +452,20 @@
     const run = !fresh && cache.has(id) ? cache.get(id) : await api(`/api/runs/${encodeURIComponent(id)}`);
     cache.set(id, run);
     if (sequence !== loadSequence) return;
+    const changed = selectedRun?.id !== run.id;
     selectedRun = run;
-    renderSelectedRun();
+    if (changed) clearFilters(); else renderSelectedRun();
     return run;
   }
 
   async function openRun(id) {
-    go("findings");
-    replace("#findings-table", node("div", "loading-placeholder loading-dot", "正在载入巡检证据"));
+    go("findings", true, false);
+    replace("#findings-table", skeleton());
     try { await loadRun(id); } catch (error) { notify(error.message, true); renderSelectedRun(); }
   }
 
   async function showFinding(runId, findingId) {
+    const trigger = document.activeElement;
     try {
       const run = cache.get(runId) || await api(`/api/runs/${encodeURIComponent(runId)}`);
       cache.set(runId, run);
@@ -399,7 +483,17 @@
       }
       content.append(grid);
       const evidence = node("section", "detail-section");
-      evidence.append(node("h3", "", "命中证据"), node("pre", "evidence-box", string(finding.evidence, "本条发现未提供文本证据，请核查原始记录。")));
+      const evidenceHeader = node("div", "section-actions");
+      evidenceHeader.append(node("h3", "", "命中证据（已脱敏）"), action("复制证据", async event => {
+        const button = event.currentTarget; button.disabled = true;
+        try {
+          await navigator.clipboard.writeText(string(finding.evidence, ""));
+          button.textContent = "已复制 ✓";
+        } catch (_) {
+          button.textContent = "复制失败，请手动选取";
+        } finally { button.disabled = false; }
+      }));
+      evidence.append(evidenceHeader, node("pre", "evidence-box", string(finding.evidence, "本条发现未提供文本证据，请核查原始记录。")));
       content.append(evidence);
       for (const [label, value] of [["可能带来的影响", finding.impact], ["建议如何处理", finding.remediation]]) {
         const section = node("section", "detail-section"); section.append(node("h3", "", label), node("p", "", string(value))); content.append(section);
@@ -426,17 +520,18 @@
       form.addEventListener("submit", event => event.preventDefault());
       form.append(label, note, buttons, node("p", "review-note", "标记误报会保留原始发现与证据，方便后续审阅。"));
       content.append(form); replace("#dialog-content", content);
-      const dialog = $("#finding-dialog"); if (!dialog.open) dialog.showModal();
+      presentDialog($("#finding-dialog"), trigger, $("#close-dialog"));
     } catch (error) { notify(error.message, true); }
   }
 
   function renderReports() {
-    if (!state.runs.length) return replace("#report-list", empty("暂时没有可导出的报告", "完成巡检后，可以导出实际检查结果。"));
+    if (!state.runs.length) return replace("#report-list", empty("暂时没有可导出的报告", "完成巡检后，可以预览证据并选择需要的格式。", "发起巡检", () => go("new-run")));
     const rows = state.runs.map(run => {
       const row = node("div", "report-row");
       const description = node("div");
       description.append(node("h3", "", targetLabel(run)), node("p", "", `${date(run.created_at)} · ${number(run.summary?.total)} 条发现 · ${run.id}`));
       const buttons = node("div", "button-row");
+      buttons.append(action("预览报告", () => previewReport(run.id), "button primary small"));
       for (const [format, label] of [["html", "网页报告 ↓"], ["markdown", "Markdown ↓"], ["csv", "CSV ↓"], ["json", "JSON ↓"]]) {
         buttons.append(action(label, event => downloadReport(run.id, format, event.currentTarget)));
       }
@@ -462,6 +557,12 @@
 
   function renderSettings() {
     const list = targets();
+    $("#platform-status").textContent = connected ? state.platform || "恒脑接入状态未提供" : "服务未连接，接入状态未知";
+    $("#integration-status").textContent = connected ? state.platform || "待配置" : "连接服务后查看";
+    $("#last-refreshed").textContent = lastRefresh ? `最近同步 ${date(lastRefresh)} · 可见时每 20 秒自动同步` : "尚未连接";
+    replace("#service-info", [["服务版本", connected ? state.version || "未提供" : "—"], ["恒脑接入说明", connected ? state.platform || "未提供" : "—"], ["私网目标", connected ? state.allow_private ? "允许（仍受授权范围限制）" : "禁止" : "—"], ["授权目标 / 近期事件", connected ? `${list.length} 个 / ${state.events.length} 条` : "—"]].map(([label, value]) => {
+      const item = node("div"); item.append(node("span", "field-help", label), node("strong", "", value)); return item;
+    }));
     $("#target-options").replaceChildren(...list.map(target => new Option(target, target)));
     const oldTarget = $("#schedule-target").value;
     $("#schedule-target").replaceChildren(...(list.length ? list.map(target => new Option(target, target)) : [new Option("尚未配置授权目标", "")]));
@@ -477,12 +578,12 @@
       const info = node("div");
       info.append(node("strong", "", string(schedule.target)), node("p", "", `每 ${number(schedule.interval_minutes)} 分钟 · ${schedule.enabled ? "已启用" : "已停用"}${schedule.next_run_at ? ` · 下次 ${date(schedule.next_run_at)}` : ""}`));
       row.append(info);
-      if (schedule.enabled) row.append(action("停用计划", async event => {
+      if (schedule.last_run_id) info.append(action("查看上次结果 →", () => openRun(schedule.last_run_id), "text-button"));
+      row.append(action(schedule.enabled ? "停用计划" : "启用计划", async event => {
         const button = event.currentTarget; button.disabled = true;
-        try { await api(`/api/schedules/${encodeURIComponent(schedule.id)}`, { method: "POST", body: JSON.stringify({ enabled: false }) }); await refresh(false); notify("定时计划已停用。"); }
+        try { await api(`/api/schedules/${encodeURIComponent(schedule.id)}`, { method: "POST", body: JSON.stringify({ enabled: !schedule.enabled }) }); await refresh(false); notify(schedule.enabled ? "定时计划已停用。" : "定时计划已启用。"); }
         catch (error) { notify(error.message, true); button.disabled = false; }
       }));
-      else row.append(node("span", "status-pill neutral", "已停用"));
       return row;
     }));
     const events = (state.events || []).slice(0, 15);
@@ -493,19 +594,36 @@
     }) : node("p", "body-copy", "暂时没有事件。巡检和计划执行后，这里会显示实际记录。"));
   }
 
-  async function refresh(showMessage = true) {
+  async function refresh(showMessage = true, silent = false) {
+    if (refreshTask) {
+      if (silent) return refreshTask;
+      try { await refreshTask; } catch (_) { /* Manual retry fetches again. */ }
+    }
+    const task = refreshData(showMessage, silent);
+    refreshTask = task;
+    try { return await task; } finally { if (refreshTask === task) refreshTask = null; }
+  }
+
+  async function refreshData(showMessage, silent) {
+    refreshing = true;
     const button = $("#refresh-button"); button.disabled = true;
     try {
       const data = await api("/api/state");
       state = {
+        version: data.version, platform: data.platform, allow_private: data.allow_private,
         runs: Array.isArray(data.runs) ? data.runs : [],
         targets: Array.isArray(data.targets) ? data.targets : [],
         schedules: Array.isArray(data.schedules) ? data.schedules : [],
         events: Array.isArray(data.events) ? data.events : []
       };
       state.runs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      lastRefresh = new Date().toISOString();
       setConnection(true, "服务已连接");
-      updateRunOptions(); renderMetrics(); renderHistory(); renderReports(); renderSettings();
+      updateRunOptions(); renderMetrics();
+      const focus = document.activeElement;
+      if (!silent || !focus.closest("#history-list, #history-pagination")) renderHistory();
+      if (!silent || !focus.closest("#report-list")) renderReports();
+      if (!silent || !focus.closest("#schedule-list")) renderSettings();
       const latest = state.runs[0];
       renderLatest(latest);
       if (latest) {
@@ -514,16 +632,16 @@
         if (!selectedRun) selectedRun = full;
         else if (selectedRun.id === full.id) selectedRun = full;
       }
-      renderSelectedRun();
+      if (!silent) renderSelectedRun();
       if (showMessage) notify("数据已刷新。");
     } catch (error) {
       if (!connected || !state.runs.length) {
         setConnection(false, "服务未连接");
         replace("#latest-run-content", empty("暂时无法连接服务", "请确认服务已启动；远程访问请先填写 API 访问令牌。", "设置连接", () => go("settings")));
       }
-      notify(error.message, true);
+      if (!silent) notify(error.message, true);
       throw error;
-    } finally { button.disabled = false; }
+    } finally { button.disabled = false; refreshing = false; }
   }
 
   async function bootstrap() {
@@ -544,19 +662,20 @@
     $("#target-input").required = mode === "url";
     $("#target-input").disabled = mode !== "url";
     $("#max-pages").disabled = mode !== "url";
+    updateBaselineOptions();
   }
 
   $$("[data-page]").forEach(button => button.addEventListener("click", () => go(button.dataset.page)));
   $$("[data-go]").forEach(button => button.addEventListener("click", () => go(button.dataset.go)));
   $(".brand").addEventListener("click", event => { event.preventDefault(); go("overview"); });
-  $("#quick-demo").addEventListener("click", () => {
-    $("input[name=mode][value=demo]").checked = true; $("#demo-variant").value = "before"; $("#baseline-select").value = ""; updateMode(); go("new-run");
-  });
+  $("#quick-demo").addEventListener("click", startDemo);
   $$("input[name=mode]").forEach(input => input.addEventListener("change", updateMode));
   $("#refresh-button").addEventListener("click", () => { refresh().catch(() => {}); });
   $("#finding-run").addEventListener("change", event => openRun(event.target.value));
-  $("#severity-filter").addEventListener("change", renderSelectedRun);
-  $("#review-filter").addEventListener("change", renderSelectedRun);
+  for (const id of [...filterIds, "finding-sort"]) $("#" + id).addEventListener(["url-filter", "finding-search"].includes(id) ? "input" : "change", renderSelectedRun);
+  $("#clear-filters").addEventListener("click", clearFilters);
+  $("#target-input").addEventListener("input", updateBaselineOptions);
+  for (const id of ["history-search", "history-mode"]) $("#" + id).addEventListener(id === "history-search" ? "input" : "change", () => { historyPage = 1; renderHistory(); });
   $("#custom-keywords").addEventListener("input", event => event.target.setCustomValidity(""));
   $("#close-dialog").addEventListener("click", () => $("#finding-dialog").close());
   $("#finding-dialog").addEventListener("click", event => {
@@ -585,6 +704,13 @@
     const baselineId = $("#baseline-select").value;
     if (baselineId) body.baseline_id = baselineId;
     busy = true;
+    const controls = $$("input, select, textarea", form).map(control => [control, control.disabled]);
+    controls.forEach(([control]) => { control.disabled = true; });
+    form.setAttribute("aria-busy", "true");
+    const started = Date.now();
+    const elapsed = setInterval(() => {
+      $("#run-progress").textContent = `已等待 ${Math.floor((Date.now() - started) / 1000)} 秒 · 服务正在处理，完成后自动显示结果。当前接口不提供逐页进度。`;
+    }, 1000);
     $("#run-submit").disabled = true;
     $("#run-submit").textContent = "正在巡检…";
     $("#run-progress").textContent = "正在检查页面并整理证据，请保留页面。完成后会自动显示结果。";
@@ -592,7 +718,9 @@
     try {
       const run = await api("/api/runs", { method: "POST", body: JSON.stringify(body) });
       cache.set(run.id, run); selectedRun = run;
-      await refresh(false);
+      if (mode === "demo") demoKeywords = { id: run.id, values: customKeywords };
+      try { await refresh(false); } catch (_) { notify("巡检已保存，但列表同步失败。稍后可手动刷新。", true); }
+      clearFilters();
       $("#severity-filter").value = "all"; $("#review-filter").value = "all";
       renderSelectedRun(); go("findings");
       notify(`巡检记录已保存，共 ${number(run.summary?.total)} 条发现。请查看覆盖范围并确认结果。`);
@@ -600,6 +728,9 @@
     } catch (error) {
       $("#run-progress").textContent = error.message; notify(error.message, true);
     } finally {
+      clearInterval(elapsed);
+      controls.forEach(([control, disabled]) => { control.disabled = disabled; });
+      form.removeAttribute("aria-busy"); updateMode();
       busy = false; $("#run-submit").disabled = false; $("#run-submit").textContent = "开始巡检 →"; $("#run-progress").classList.remove("loading-dot");
     }
   });
@@ -627,15 +758,107 @@
   $("#schedule-form").addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget;
+    const keywords = $("#schedule-keywords").value.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+    $("#schedule-keywords").setCustomValidity(keywords.length > 30 || keywords.some(word => word.length > 80) ? "最多 30 个关键词，每个不超过 80 字。" : "");
     if (!form.reportValidity()) return;
     const button = $("button[type=submit]", form); button.disabled = true;
     try {
-      await api("/api/schedules", { method: "POST", body: JSON.stringify({ target: $("#schedule-target").value, interval_minutes: Number($("#schedule-interval").value), authorized: $("#schedule-authorized").checked, custom_keywords: [], enabled: true }) });
+      await api("/api/schedules", { method: "POST", body: JSON.stringify({ target: $("#schedule-target").value, interval_minutes: Number($("#schedule-interval").value), authorized: $("#schedule-authorized").checked, custom_keywords: keywords, enabled: true }) });
       await refresh(false); $("#schedule-authorized").checked = false; notify("定时计划已创建。请保持服务运行。");
     } catch (error) { notify(error.message, true); } finally { button.disabled = !targets().length; }
   });
 
+  function presentDialog(dialog, trigger, closeButton) {
+    dialog.returnFocus = trigger;
+    if (!dialog.open) dialog.showModal();
+    closeButton.focus();
+  }
+
+  for (const dialog of $$("dialog")) {
+    dialog.addEventListener("close", () => {
+      if (dialog.id === "report-dialog") previewSequence++;
+      const trigger = dialog.returnFocus;
+      if (trigger?.isConnected && trigger.getClientRects().length) trigger.focus();
+      else $("#main").focus({ preventScroll: true });
+    });
+    dialog.addEventListener("keydown", event => {
+      if (event.key !== "Tab") return;
+      const items = $$("button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), summary, a[href]", dialog).filter(item => item.getClientRects().length);
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    });
+  }
+
+  function startDemo() {
+    $("input[name=mode][value=demo]").checked = true;
+    $("#demo-variant").value = "before"; $("#baseline-select").value = "";
+    $("#authorized").checked = false;
+    updateMode(); go("new-run");
+  }
+
+  function dismissGuide() {
+    try { localStorage.setItem("xunan-guide-seen", "1"); } catch (_) { /* Optional preference. */ }
+    $("#guide-dialog").close();
+  }
+  $("#show-guide").addEventListener("click", () => presentDialog($("#guide-dialog"), document.activeElement, $("#close-guide")));
+  $("#guide-start").addEventListener("click", () => { dismissGuide(); startDemo(); });
+  $("#close-guide").addEventListener("click", dismissGuide);
+  $("#guide-skip").addEventListener("click", dismissGuide);
+  $("#guide-dialog").addEventListener("cancel", dismissGuide);
+  $("#close-report").addEventListener("click", () => $("#report-dialog").close());
+
+  async function previewReport(id) {
+    const sequence = ++previewSequence;
+    presentDialog($("#report-dialog"), document.activeElement, $("#close-report"));
+    replace("#report-preview-content", skeleton());
+    try {
+      const run = await api(`/api/reports/${encodeURIComponent(id)}?format=json`);
+      if (sequence !== previewSequence || !$("#report-dialog").open) return;
+      const box = node("div", "report-preview");
+      box.append(node("h3", "", targetLabel(run)), node("p", "body-copy", runLabel(run)));
+      box.append(node("p", "report-summary", `共 ${number(run.summary?.total)} 条发现，检查 ${number(run.coverage?.visited)} 个资源。${run.coverage?.complete ? "本轮覆盖完整。" : "本轮覆盖不足，请核查过程记录。"}`));
+      box.append(node("p", "field-help", (run.limitations || []).join("；")));
+      const names = { new: "新发现", persistent: "持续存在", not_observed: "本次未再发现（待确认）", uncertain: "覆盖不足，待复查" };
+      const comparison = node("section", "detail-section");
+      comparison.append(node("h3", "", "基线对比"), node("p", "", run.baseline_id ? "未再发现不等于已修复，请结合覆盖情况与人工复核。" : "首轮检查，尚无复测结论。"));
+      for (const [key, title] of Object.entries(names)) {
+        const details = node("details", "detail-section");
+        const entries = (run.comparison?.entries || []).filter(entry => entry.status === key);
+        details.append(node("summary", "", `${title} · ${number(run.comparison?.counts?.[key])} 条`));
+        for (const entry of entries) details.append(node("p", "body-copy", `${string(entry.title)} · ${string(entry.url)}`));
+        comparison.append(details);
+      }
+      box.append(comparison);
+      for (const finding of run.findings || []) {
+        const item = node("details", "detail-section");
+        item.append(node("summary", "", `${severityNames[finding.severity] || "提示"} · ${finding.title}`), node("p", "body-copy", finding.url), node("pre", "evidence-box", finding.evidence), node("p", "", `处理建议：${string(finding.remediation)}`), node("p", "", `复核：${reviewNames[finding.review_status] || "待确认"} · ${finding.review_note || "暂无备注"}`));
+        box.append(item);
+      }
+      const json = node("details", "detail-section");
+      json.append(node("summary", "", "查看完整 JSON 数据"), node("pre", "evidence-box", JSON.stringify(run, null, 2)));
+      box.append(json);
+      const buttons = node("div", "button-row");
+      buttons.append(action("下载网页报告", event => downloadReport(id, "html", event.currentTarget)), action("下载 JSON", event => downloadReport(id, "json", event.currentTarget)));
+      box.append(buttons); replace("#report-preview-content", box);
+    } catch (error) {
+      if (sequence === previewSequence) replace("#report-preview-content", empty("报告暂时无法加载", error.message, "重试", () => previewReport(id)));
+    }
+  }
+
+  function autoRefresh() {
+    if (document.hidden || busy || refreshing || $("dialog[open]")) return;
+    refresh(false, true).catch(() => {});
+  }
+  setInterval(autoRefresh, 20000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) autoRefresh(); });
+  window.addEventListener("beforeunload", event => { if (busy) { event.preventDefault(); event.returnValue = ""; } });
+  $$(".nav-item").forEach(button => { button.setAttribute("aria-label", pageNames[button.dataset.page]); button.title = pageNames[button.dataset.page]; });
+  $("#schedule-keywords").addEventListener("input", event => event.target.setCustomValidity(""));
+
   updateMode(); renderMetrics(); renderLatest(null); renderHistory(); renderSelectedRun(); renderReports(); renderSettings();
   go(location.hash.slice(1) || "overview", false);
-  bootstrap();
+  bootstrap().then(() => {
+    try { if (!localStorage.getItem("xunan-guide-seen") && !state.runs.length) presentDialog($("#guide-dialog"), $("#show-guide"), $("#close-guide")); } catch (_) { /* Guide remains available from overview. */ }
+  });
 })();
