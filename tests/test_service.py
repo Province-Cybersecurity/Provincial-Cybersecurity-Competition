@@ -264,9 +264,10 @@ class ReportTests(unittest.TestCase):
             "=6",
             "+evidence",
             "-pending",
+            " \t=NOTE()",
             "@remediation",
         ]
-        keys = ("id", "rule_id", "severity", "title", "url", "line", "evidence", "review_status", "remediation")
+        keys = ("id", "rule_id", "severity", "title", "url", "line", "evidence", "review_status", "review_note", "remediation")
         finding = dict(zip(keys, values))
         data, mime, extension = render(self.run_fixture(finding), "csv")
         rows = list(csv.reader(io.StringIO(data.decode("utf-8-sig"))))
@@ -277,6 +278,36 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(len(rows[1]), len(values))
         self.assertTrue(all(cell.startswith("'") for cell in rows[1]))
         self.assertEqual([cell[1:] for cell in rows[1]], values)
+
+    def test_review_notes_and_comparison_entries_are_escaped_in_reports(self):
+        finding = {
+            "id": "finding", "rule_id": "rule", "severity": "low", "title": "待核查内容",
+            "url": "https://demo.invalid/", "line": 1, "evidence": "已脱敏",
+            "impact": "检查", "remediation": "复核", "review_status": "confirmed",
+            "review_note": "</p><script>NOTEATTACK</script>[备注](javascript:alert(1))",
+        }
+        run = self.run_fixture(finding)
+        run["baseline_id"] = "baseline"
+        run["comparison"] = {
+            "counts": dict.fromkeys(("new", "persistent", "not_observed", "uncertain"), 1),
+            "entries": [{"status": status, "title": "<img src=x onerror=ENTRYATTACK>" + status,
+                         "url": "https://demo.invalid/<svg onload=URLATTACK>"}
+                        for status in ("new", "persistent", "not_observed", "uncertain")],
+        }
+        for format_name in ("html", "markdown"):
+            with self.subTest(format_name=format_name):
+                report = render(run, format_name)[0].decode()
+                self.assertIn("复核备注", report)
+                self.assertIn("已确认", report)
+                self.assertIn("NOTEATTACK", report)
+                self.assertIn("ENTRYATTACK", report)
+                self.assertIn("URLATTACK", report)
+                for markup in ("<script>", "<img src=x", "<svg onload="):
+                    self.assertNotIn(markup, report)
+                for label in ("新发现", "持续存在", "本次未再发现（待确认）", "覆盖不足，待复查"):
+                    self.assertIn(label, report)
+        markdown = render(run, "markdown")[0].decode()
+        self.assertNotIn("[备注](javascript:", markdown)
 
     def test_csv_preserves_zero_line_number_for_header_findings(self):
         finding = {
