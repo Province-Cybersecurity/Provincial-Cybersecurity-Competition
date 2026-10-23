@@ -120,3 +120,7 @@ python3 -m json.tool integrations/hengnao/openapi.json >/dev/null
 
 项目采用 [MIT License](LICENSE)。
 
+
+## 使用体验更新
+
+2026-10-23 完成首次引导、记录搜索分页、风险组合筛选、证据复制、报告预览、定时关键词和自动同步等改进。体验步骤与验证记录见 [体验优化说明](docs/体验优化说明.md)。新增工作台操作需要运行 Python 后端。
